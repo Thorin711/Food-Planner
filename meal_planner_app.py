@@ -80,26 +80,47 @@ def generate_meals_with_gemini(dietary_prefs, dinner_settings):
         st.error(f"Failed to parse API response: {e}")
         return None
 
-def get_random_meal(meal_type, existing_meal=None):
+def get_random_meal(meal_type, existing_meals=None):
     if 'generated_meals' not in st.session_state or not st.session_state.generated_meals:
         return {'name': "Generate a meal plan first!", 'ingredients': [], 'instructions': ''}
+    
     meal_list = st.session_state.generated_meals.get(meal_type, [])
     if not meal_list:
         return {'name': "No meals found for this style.", 'ingredients': [], 'instructions': ''}
-    eligible_meals = [m for m in meal_list if m['name'] != (existing_meal['name'] if existing_meal else None)]
+    
+    # Ensure existing_meals is a list of names
+    existing_names = []
+    if existing_meals:
+        if isinstance(existing_meals, list):
+            existing_names = [m['name'] for m in existing_meals]
+        elif isinstance(existing_meals, dict): # Handle single meal object
+            existing_names = [existing_meals['name']]
+
+    eligible_meals = [m for m in meal_list if m['name'] not in existing_names]
+    
     return random.choice(eligible_meals) if eligible_meals else random.choice(meal_list)
 
 def generate_shopping_list(meal_plan, pantry_items):
     required_items = {}
     pantry_set = {item.strip().lower() for item in pantry_items}
-    for day_meals in meal_plan.values():
-        for meal in day_meals.values():
-            if not meal or 'ingredients' not in meal: continue
+    
+    # Process lunches
+    for meal in meal_plan.get('Lunches', []):
+        for ingredient in meal['ingredients']:
+            item_name = ingredient['item'].strip().lower()
+            if item_name in pantry_set: continue
+            key = (item_name, ingredient['unit'])
+            required_items[key] = required_items.get(key, 0) + ingredient['quantity']
+
+    # Process dinners
+    for meal in meal_plan.get('Dinners', {}).values():
+        if meal:
             for ingredient in meal['ingredients']:
                 item_name = ingredient['item'].strip().lower()
                 if item_name in pantry_set: continue
                 key = (item_name, ingredient['unit'])
                 required_items[key] = required_items.get(key, 0) + ingredient['quantity']
+                
     if not required_items: return "You have everything you need!"
     shopping_list_str = ""
     for (item, unit), quantity in sorted(required_items.items()):
@@ -112,7 +133,6 @@ def generate_shopping_list(meal_plan, pantry_items):
 def main():
     st.set_page_config(page_title="Weekly Meal Planner", layout="wide")
     
-    # --- CUSTOM CSS TO WIDEN THE SIDEBAR ---
     st.markdown(
         """
         <style>
@@ -124,8 +144,6 @@ def main():
         unsafe_allow_html=True,
     )
 
-
-    # Initialize session state
     for key, default in [('meal_plan', {}), ('pantry_items', ["Olive Oil", "Salt", "Black Pepper", "Garlic", "Onion Powder"]), ('shopping_list', ""), ('generated_meals', None), ('dinner_settings', {})]:
         if key not in st.session_state:
             st.session_state[key] = default
@@ -143,39 +161,24 @@ def main():
         selected_days_list = []
         for day in days_of_week:
             col1, col2 = st.columns([2, 3])
-            with col1:
-                st.markdown(f"**{day}**")
+            with col1: st.markdown(f"**{day}**")
             with col2:
-                # Use a unique key for each radio button group
-                choice = st.radio(
-                    label=f"Plan for {day}?", # Hidden label for semantics
-                    options=["Plan", "Skip"], 
-                    index=0 if day in default_days else 1,
-                    horizontal=True, 
-                    key=f"radio_{day}",
-                    label_visibility="collapsed"
-                )
+                choice = st.radio(label=f"Plan for {day}?", options=["Plan", "Skip"], index=0 if day in default_days else 1, horizontal=True, key=f"radio_{day}", label_visibility="collapsed")
             if choice == "Plan":
                 selected_days_list.append(day)
         
         selected_days = selected_days_list
 
-        # --- Per-Day Dinner Settings ---
         if any(day in selected_days for day in days_of_week):
             st.header("Evening Meal Settings")
             for day in selected_days:
-                # Ensure settings for the day exist
                 if day not in st.session_state.dinner_settings:
                     st.session_state.dinner_settings[day] = {'plan': True, 'style': "Quick Cook (<30 mins)"}
-                
                 with st.expander(day, expanded=False):
                     plan_dinner_for_day = st.checkbox("Plan dinner?", value=st.session_state.dinner_settings[day]['plan'], key=f"plan_{day}")
                     st.session_state.dinner_settings[day]['plan'] = plan_dinner_for_day
-                    
                     if plan_dinner_for_day:
-                        dinner_style_for_day = st.radio("Style:", ["Quick Cook (<30 mins)", "Full Cook (longer prep)"], 
-                                                        index=0 if st.session_state.dinner_settings[day]['style'] == "Quick Cook (<30 mins)" else 1,
-                                                        horizontal=True, key=f"style_{day}")
+                        dinner_style_for_day = st.radio("Style:", ["Quick Cook (<30 mins)", "Full Cook (longer prep)"], index=0 if st.session_state.dinner_settings[day]['style'] == "Quick Cook (<30 mins)" else 1, horizontal=True, key=f"style_{day}")
                         st.session_state.dinner_settings[day]['style'] = dinner_style_for_day
         
         if st.button("Generate Full Meal Plan", type="primary"):
@@ -183,14 +186,17 @@ def main():
                 st.session_state.generated_meals = generate_meals_with_gemini(dietary_prefs, st.session_state.dinner_settings)
             
             if st.session_state.generated_meals:
-                st.session_state.meal_plan = {}
+                st.session_state.meal_plan = {'Lunches': [], 'Dinners': {}}
+                # Populate Lunches
+                for _ in selected_days:
+                    st.session_state.meal_plan['Lunches'].append(get_random_meal('Lunch', st.session_state.meal_plan['Lunches']))
+                
+                # Populate Dinners
                 for day in selected_days:
-                    st.session_state.meal_plan[day] = {'Lunch': get_random_meal('Lunch')}
-                    # Assign dinner based on per-day settings
                     day_settings = st.session_state.dinner_settings.get(day, {'plan': False})
                     if day_settings['plan']:
                         meal_pool = "QuickDinner" if day_settings['style'] == "Quick Cook (<30 mins)" else "FullDinner"
-                        st.session_state.meal_plan[day]['Dinner'] = get_random_meal(meal_pool)
+                        st.session_state.meal_plan['Dinners'][day] = get_random_meal(meal_pool)
                 st.session_state.shopping_list = ""
                 st.success("New meal plan generated!")
             else:
@@ -201,41 +207,44 @@ def main():
     if not st.session_state.meal_plan:
         st.info("Click 'Generate Full Meal Plan' in the sidebar to start.")
     else:
-        for day, meals in st.session_state.meal_plan.items():
-            st.subheader(f"📅 {day}")
-            
-            should_plan_dinners = 'Dinner' in meals and meals.get('Dinner') and meals['Dinner']['name'] != 'No meals found for this style.'
-            cols = st.columns(2) if should_plan_dinners else [st.container()]
-            
-            with cols[0]:
-                st.markdown("#####  lunchtime 🥪 (Prep-Ahead)")
-                if meals['Lunch']:
-                    with st.expander(f"**{meals['Lunch']['name']}**"):
-                        st.markdown("**Ingredients:**")
-                        for ing in meals['Lunch']['ingredients']:
-                            st.markdown(f"- {ing['item']}: {ing['quantity']} {ing['unit']}")
-                        st.markdown("**Instructions:**")
-                        st.write(meals['Lunch']['instructions'])
-                        if st.button("Regenerate Lunch", key=f"regen_lunch_{day}"):
-                            st.session_state.meal_plan[day]['Lunch'] = get_random_meal('Lunch', meals['Lunch'])
-                            st.session_state.shopping_list = ""; st.rerun()
+        # --- LUNCH PREP SECTION ---
+        st.header("Weekday Lunch Prep 🥪")
+        st.write("All your prep-ahead lunches for the week, ready for your weekend cooking session.")
+        lunches = st.session_state.meal_plan.get('Lunches', [])
+        if lunches:
+            for i, lunch in enumerate(lunches):
+                with st.expander(f"**Lunch Option {i+1}: {lunch['name']}**"):
+                    st.markdown("**Ingredients:**")
+                    for ing in lunch['ingredients']:
+                        st.markdown(f"- {ing['item']}: {ing['quantity']} {ing['unit']}")
+                    st.markdown("**Instructions:**")
+                    st.write(lunch['instructions'])
+                    if st.button("Regenerate Lunch", key=f"regen_lunch_{i}"):
+                        st.session_state.meal_plan['Lunches'][i] = get_random_meal('Lunch', st.session_state.meal_plan['Lunches'])
+                        st.session_state.shopping_list = ""
+                        st.rerun()
+        st.divider()
 
-            if should_plan_dinners:
-                with cols[1]:
-                    st.markdown("##### Evening Meal 🍝 (Cook Fresh)")
-                    if meals['Dinner']:
-                        with st.expander(f"**{meals['Dinner']['name']}**"):
-                            st.markdown("**Ingredients:**")
-                            for ing in meals['Dinner']['ingredients']:
-                                st.markdown(f"- {ing['item']}: {ing['quantity']} {ing['unit']}")
-                            st.markdown("**Instructions:**")
-                            st.write(meals['Dinner']['instructions'])
-                            if st.button("Regenerate Dinner", key=f"regen_dinner_{day}"):
-                                day_settings = st.session_state.dinner_settings.get(day)
-                                meal_pool = "QuickDinner" if day_settings['style'] == "Quick Cook (<30 mins)" else "FullDinner"
-                                st.session_state.meal_plan[day]['Dinner'] = get_random_meal(meal_pool, meals['Dinner'])
-                                st.session_state.shopping_list = ""; st.rerun()
-            st.divider()
+        # --- EVENING MEALS SECTION ---
+        st.header("Evening Meals 🍝")
+        st.write("Your fresh-cook evening meals, organized by day.")
+        dinners = st.session_state.meal_plan.get('Dinners', {})
+        for day in selected_days:
+            dinner = dinners.get(day)
+            if dinner:
+                st.subheader(f"📅 {day}")
+                with st.expander(f"**{dinner['name']}**"):
+                    st.markdown("**Ingredients:**")
+                    for ing in dinner['ingredients']:
+                        st.markdown(f"- {ing['item']}: {ing['quantity']} {ing['unit']}")
+                    st.markdown("**Instructions:**")
+                    st.write(dinner['instructions'])
+                    if st.button("Regenerate Dinner", key=f"regen_dinner_{day}"):
+                        day_settings = st.session_state.dinner_settings.get(day)
+                        meal_pool = "QuickDinner" if day_settings['style'] == "Quick Cook (<30 mins)" else "FullDinner"
+                        st.session_state.meal_plan['Dinners'][day] = get_random_meal(meal_pool, dinner)
+                        st.session_state.shopping_list = ""
+                        st.rerun()
 
     if st.session_state.meal_plan:
         st.title("🛒 Shopping & Pantry")
@@ -245,7 +254,8 @@ def main():
             pantry_text = st.text_area("Your Pantry:", value="\n".join(st.session_state.pantry_items), height=250, label_visibility="collapsed")
             if st.button("Update Pantry List"):
                 st.session_state.pantry_items = [item.strip() for item in pantry_text.split('\n') if item.strip()]
-                st.session_state.shopping_list = ""; st.success("Pantry updated!")
+                st.session_state.shopping_list = ""
+                st.success("Pantry updated!")
         with shopping_col:
             st.subheader("Generated Shopping List")
             if st.button("Generate Shopping List", type="primary"):
@@ -257,4 +267,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
