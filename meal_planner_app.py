@@ -2,6 +2,7 @@ import streamlit as st
 import random
 import json
 import requests
+import re
 
 # --- HELPER FUNCTIONS ---
 
@@ -91,11 +92,26 @@ def generate_meals_with_gemini(dietary_prefs, dinner_settings, num_lunches):
         return None
 
 def format_instructions(instructions_text):
-    """Formats a block of text into a numbered markdown list."""
+    """
+    Formats a block of text into a clean, numbered markdown list.
+    It cleans up any existing numbering from the source text.
+    """
     if not instructions_text or not isinstance(instructions_text, str):
         return "No instructions provided."
-    steps = [f"{i+1}. {step.strip()}" for i, step in enumerate(instructions_text.strip().split('\n')) if step.strip()]
-    return "\n".join(steps)
+
+    cleaned_steps = []
+    # Split the text into lines
+    lines = instructions_text.strip().split('\n')
+
+    for line in lines:
+        # Use regex to strip leading numbers like "1.", "2.", " 1. ", etc.
+        cleaned_line = re.sub(r'^\s*\d+\.\s*', '', line.strip())
+        if cleaned_line: # Only add if there's content left
+            cleaned_steps.append(cleaned_line)
+
+    # Re-number the cleaned steps
+    formatted_steps = [f"{i+1}. {step}" for i, step in enumerate(cleaned_steps)]
+    return "\n".join(formatted_steps)
 
 def get_random_meal(meal_type, existing_meals=None):
     if 'generated_meals' not in st.session_state or not st.session_state.generated_meals:
