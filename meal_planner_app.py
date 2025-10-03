@@ -149,7 +149,11 @@ def generate_shopping_list(meal_plan, pantry_items):
     if not required_items: return "You have everything you need!"
     shopping_list_str = ""
     for (item, unit), quantity in sorted(required_items.items()):
-        unit_str = unit + ('s' if quantity > 1 and len(unit) > 1 else '')
+        # Handle pluralization more robustly to avoid double 's'
+        if quantity > 1 and not unit.lower().endswith('s'):
+            unit_str = unit + 's'
+        else:
+            unit_str = unit
         shopping_list_str += f"- {item.title()}: {quantity} {unit_str}\n"
     return shopping_list_str
 
@@ -305,4 +309,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
