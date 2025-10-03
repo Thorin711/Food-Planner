@@ -10,9 +10,13 @@ def generate_meals_with_gemini(dietary_prefs, selected_days):
     Calls the Gemini API to generate a pool of meal ideas based on user preferences.
     Requests a structured JSON response.
     """
-    # Note: The API key is handled by the execution environment.
-    # In a local setup, you might need to set this explicitly.
-    api_key = "" 
+    # Securely access the API key from Streamlit's secrets
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+    except KeyError:
+        st.error("GEMINI_API_KEY not found in Streamlit secrets. Please add it to your .streamlit/secrets.toml file.")
+        return None
+        
     api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={api_key}"
 
     # Define the precise JSON structure we want the model to return.
