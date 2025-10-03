@@ -25,7 +25,7 @@ def generate_meals_with_gemini(dietary_prefs, dinner_settings, num_lunches):
             "description": "A consolidated plan for prepping lunch components over the weekend.",
             "properties": {
                 "ingredients": {"type": "ARRAY", "description": "A complete, aggregated list of all ingredients needed for all lunches.", "items": {"type": "OBJECT", "properties": {"item": {"type": "STRING"}, "quantity": {"type": "NUMBER"}, "unit": {"type": "STRING"}}, "required": ["item", "quantity", "unit"]}},
-                "prep_instructions": {"type": "STRING", "description": "A single, consolidated set of instructions for preparing all lunch components in one session."}
+                "prep_instructions": {"type": "STRING", "description": "A single, consolidated set of instructions for preparing all lunch components in one session. Each step should be on a new line."}
             },
             "required": ["ingredients", "prep_instructions"]
         },
@@ -36,7 +36,7 @@ def generate_meals_with_gemini(dietary_prefs, dinner_settings, num_lunches):
                 "type": "OBJECT",
                 "properties": {
                     "name": {"type": "STRING", "description": "A creative name for the daily assembled lunch, e.g., 'Chicken & Quinoa Power Bowl'."},
-                    "assembly_instructions": {"type": "STRING", "description": "Simple, step-by-step instructions on how to combine the prepped components for that day's lunch."}
+                    "assembly_instructions": {"type": "STRING", "description": "Simple, step-by-step instructions to combine prepped components. Each step should be on a new line."}
                 },
                 "required": ["name", "assembly_instructions"]
             }
@@ -47,12 +47,12 @@ def generate_meals_with_gemini(dietary_prefs, dinner_settings, num_lunches):
 
     # Add dinner sections to schema if needed
     if any(d['plan'] and d['style'] == "Quick Cook (<30 mins)" for d in dinner_settings.values()):
-        json_schema_properties["QuickDinner"] = {"type": "ARRAY", "description": "A list of 7 diverse, quick-cook dinner ideas.", "items": {"type": "OBJECT", "properties": {"name": {"type": "STRING"}, "ingredients": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {"item": {"type": "STRING"}, "quantity": {"type": "NUMBER"}, "unit": {"type": "STRING"}},"required": ["item", "quantity", "unit"]}}, "instructions": {"type": "STRING"}}, "required": ["name", "ingredients", "instructions"]}}
+        json_schema_properties["QuickDinner"] = {"type": "ARRAY", "description": "A list of 7 diverse, quick-cook dinner ideas.", "items": {"type": "OBJECT", "properties": {"name": {"type": "STRING"}, "ingredients": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {"item": {"type": "STRING"}, "quantity": {"type": "NUMBER"}, "unit": {"type": "STRING"}},"required": ["item", "quantity", "unit"]}}, "instructions": {"type": "STRING", "description": "Step-by-step cooking instructions. Each step on a new line."}}, "required": ["name", "ingredients", "instructions"]}}
         required_properties.append("QuickDinner")
         dinner_prompt_parts.append("a list of 7 quick-cook (under 30 minutes) dinner ideas")
 
     if any(d['plan'] and d['style'] == "Full Cook (longer prep)" for d in dinner_settings.values()):
-        json_schema_properties["FullDinner"] = {"type": "ARRAY", "description": "A list of 7 diverse, 'full cook' dinner ideas.", "items": {"type": "OBJECT", "properties": {"name": {"type": "STRING"}, "ingredients": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {"item": {"type": "STRING"}, "quantity": {"type": "NUMBER"}, "unit": {"type": "STRING"}},"required": ["item", "quantity", "unit"]}}, "instructions": {"type": "STRING"}}, "required": ["name", "ingredients", "instructions"]}}
+        json_schema_properties["FullDinner"] = {"type": "ARRAY", "description": "A list of 7 diverse, 'full cook' dinner ideas.", "items": {"type": "OBJECT", "properties": {"name": {"type": "STRING"}, "ingredients": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {"item": {"type": "STRING"}, "quantity": {"type": "NUMBER"}, "unit": {"type": "STRING"}},"required": ["item", "quantity", "unit"]}}, "instructions": {"type": "STRING", "description": "Step-by-step cooking instructions. Each step on a new line."}}, "required": ["name", "ingredients", "instructions"]}}
         required_properties.append("FullDinner")
         dinner_prompt_parts.append("a list of 7 'full cook' (more involved) dinner ideas")
 
@@ -60,7 +60,7 @@ def generate_meals_with_gemini(dietary_prefs, dinner_settings, num_lunches):
     
     dinner_prompt = f"Also, please generate { ' and '.join(dinner_prompt_parts) } for two people." if dinner_prompt_parts else ""
 
-    system_prompt = "You are an expert meal prep chef. Your task is to create a smart, efficient weekly meal plan. For lunches, you must first design a set of common, preppable components, provide a single set of instructions to prepare them all at once, and then provide simple daily instructions to assemble them into unique meals. For dinners, provide full recipes. Adhere strictly to the user's dietary needs and return the response *only* in the requested JSON format."
+    system_prompt = "You are an expert meal prep chef. Your task is to create a smart, efficient weekly meal plan. For lunches, you must first design a set of common, preppable components, provide a single set of instructions to prepare them all at once, and then provide simple daily instructions to assemble them into unique meals. For dinners, provide full recipes. Ensure each instruction step is on a new line. Adhere strictly to the user's dietary needs and return the response *only* in the requested JSON format."
     user_prompt = (
         f"Create a meal plan for one person based on these dietary requirements: '{dietary_prefs}'.\n\n"
         f"LUNCH PLAN (for {num_lunches} days):\n"
@@ -89,6 +89,12 @@ def generate_meals_with_gemini(dietary_prefs, dinner_settings, num_lunches):
         st.error(f"Failed to parse API response: {e}")
         return None
 
+def format_instructions(instructions_text):
+    """Formats a block of text into a numbered markdown list."""
+    if not instructions_text or not isinstance(instructions_text, str):
+        return "No instructions provided."
+    steps = [f"{i+1}. {step.strip()}" for i, step in enumerate(instructions_text.strip().split('\n')) if step.strip()]
+    return "\n".join(steps)
 
 def get_random_meal(meal_type, existing_meals=None):
     if 'generated_meals' not in st.session_state or not st.session_state.generated_meals:
@@ -207,9 +213,8 @@ def main():
         if lunch_prep:
             with st.container(border=True):
                 st.subheader("Consolidated Prep Instructions")
-                st.write(lunch_prep['prep_instructions'])
+                st.markdown(format_instructions(lunch_prep['prep_instructions']))
                 if st.button("Regenerate Entire Lunch Plan"):
-                    # For simplicity, regenerating the lunch plan involves a full API call
                     with st.spinner("🧠 Gemini is rethinking your lunch prep..."):
                         new_meals = generate_meals_with_gemini(dietary_prefs, st.session_state.dinner_settings, len(selected_days))
                         if new_meals:
@@ -239,28 +244,27 @@ def main():
                 st.markdown("#####  lunchtime 🥪 (Assembly)")
                 if lunch:
                     with st.expander(f"**{lunch['name']}**"):
-                        st.write(lunch['assembly_instructions'])
+                        st.markdown(format_instructions(lunch['assembly_instructions']))
 
             if dinner:
                 with cols[1]:
                     st.markdown("##### Evening Meal 🍝 (Cook Fresh)")
                     with st.expander(f"**{dinner['name']}**"):
                         st.markdown("**Ingredients:**")
-                        # Build a single string for all ingredients to avoid extra spacing
                         ingredients_text = ""
                         for ing in dinner['ingredients']:
                             ingredients_text += f"- {ing['item']}: {ing['quantity']} {ing['unit']}\n"
                         st.markdown(ingredients_text)
                         
                         st.markdown("**Instructions:**")
-                        st.write(dinner['instructions'])
+                        st.markdown(format_instructions(dinner['instructions']))
                         if st.button("Regenerate Dinner", key=f"regen_dinner_{day}"):
                             day_settings = st.session_state.dinner_settings.get(day)
                             meal_pool = "QuickDinner" if day_settings['style'] == "Quick Cook (<30 mins)" else "FullDinner"
                             st.session_state.meal_plan['Dinners'][day] = get_random_meal(meal_pool, dinner)
                             st.session_state.shopping_list = ""
                             st.rerun()
-            st.write("") # Adds a bit of space between days
+            st.write("") 
 
     if st.session_state.meal_plan:
         st.title("🛒 Shopping & Pantry")
@@ -283,5 +287,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
