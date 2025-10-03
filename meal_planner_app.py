@@ -246,8 +246,12 @@ def main():
                     st.markdown("##### Evening Meal 🍝 (Cook Fresh)")
                     with st.expander(f"**{dinner['name']}**"):
                         st.markdown("**Ingredients:**")
+                        # Build a single string for all ingredients to avoid extra spacing
+                        ingredients_text = ""
                         for ing in dinner['ingredients']:
-                            st.markdown(f"- {ing['item']}: {ing['quantity']} {ing['unit']}")
+                            ingredients_text += f"- {ing['item']}: {ing['quantity']} {ing['unit']}\n"
+                        st.markdown(ingredients_text)
+                        
                         st.markdown("**Instructions:**")
                         st.write(dinner['instructions'])
                         if st.button("Regenerate Dinner", key=f"regen_dinner_{day}"):
@@ -279,4 +283,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
