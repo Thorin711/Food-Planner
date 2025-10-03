@@ -38,4 +38,4 @@ streamlit run meal_planner_app.py
 
 ## To do
 
-Integarte Nutrition API and Database
+Integrate Nutrition API and Database
