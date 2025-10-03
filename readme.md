@@ -34,6 +34,7 @@ To start the Streamlit application, run the following command in your terminal:
 
 ```bash
 streamlit run meal_planner_app.py
+```
 
 ## To do
 
