@@ -60,9 +60,10 @@ def generate_meals_with_gemini(dietary_prefs, dinner_settings, num_lunches):
     
     dinner_prompt = f"Also, please generate { ' and '.join(dinner_prompt_parts) } for two people." if dinner_prompt_parts else ""
 
-    system_prompt = "You are an expert meal prep chef. Your task is to create a smart, efficient weekly meal plan. For lunches, you must first design a set of common, preppable components, provide a single set of instructions to prepare them all at once, and then provide simple daily instructions to assemble them into unique meals. For dinners, provide full recipes. Ensure each instruction step is on a new line. Adhere strictly to the user's dietary needs and return the response *only* in the requested JSON format."
+    system_prompt = "You are an expert meal prep chef creating plans for a user in the UK. Your task is to create a smart, efficient weekly meal plan. All ingredient quantities **must** be in metric units (grams, kg, ml, L, etc.). For lunches, you must first design a set of common, preppable components, provide a single set of instructions to prepare them all at once, and then provide simple daily instructions to assemble them into unique meals. For dinners, provide full recipes. Ensure each instruction step is on a new line. Adhere strictly to the user's dietary needs and return the response *only* in the requested JSON format."
     user_prompt = (
-        f"Create a meal plan for one person based on these dietary requirements: '{dietary_prefs}'.\n\n"
+        f"Create a meal plan for one person based on these dietary requirements: '{dietary_prefs}'. "
+        f"IMPORTANT: All ingredient quantities must be in metric units (e.g., grams, ml).\n\n"
         f"LUNCH PLAN (for {num_lunches} days):\n"
         f"1.  First, create a consolidated 'LunchPrep' plan. This should include an aggregated list of all ingredients for the lunches, and one single set of cohesive instructions for prepping all components together during a weekend session (e.g., cook all grains, roast all vegetables, prepare all proteins).\n"
         f"2.  Then, create {num_lunches} unique 'LunchAssembly' plans. Each should have a creative name and simple instructions for assembling the prepped components into a meal each day.\n\n"
