@@ -122,25 +122,48 @@ def main():
         st.write("Set your preferences and generate a weekly meal plan.")
         st.header("Customization")
         dietary_prefs = st.text_input("Dietary Preferences & Allergens", "gluten-free, low-acid, no nuts, high-protein, meat-focused")
-        days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        selected_days = st.multiselect("Which days do you need a plan for?", options=days_of_week, default=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
         
+        st.header("Select Days to Plan")
+        days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        default_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        
+        selected_days_list = []
+        for day in days_of_week:
+            col1, col2 = st.columns([2, 3])
+            with col1:
+                st.markdown(f"**{day}**")
+            with col2:
+                # Use a unique key for each radio button group
+                choice = st.radio(
+                    label=f"Plan for {day}?", # Hidden label for semantics
+                    options=["Plan", "Skip"], 
+                    index=0 if day in default_days else 1,
+                    horizontal=True, 
+                    key=f"radio_{day}",
+                    label_visibility="collapsed"
+                )
+            if choice == "Plan":
+                selected_days_list.append(day)
+        
+        selected_days = selected_days_list
+
         # --- Per-Day Dinner Settings ---
-        st.header("Evening Meal Settings")
-        for day in selected_days:
-            # Ensure settings for the day exist
-            if day not in st.session_state.dinner_settings:
-                st.session_state.dinner_settings[day] = {'plan': True, 'style': "Quick Cook (<30 mins)"}
-            
-            with st.expander(day, expanded=False):
-                plan_dinner_for_day = st.checkbox("Plan dinner?", value=st.session_state.dinner_settings[day]['plan'], key=f"plan_{day}")
-                st.session_state.dinner_settings[day]['plan'] = plan_dinner_for_day
+        if any(day in selected_days for day in days_of_week):
+            st.header("Evening Meal Settings")
+            for day in selected_days:
+                # Ensure settings for the day exist
+                if day not in st.session_state.dinner_settings:
+                    st.session_state.dinner_settings[day] = {'plan': True, 'style': "Quick Cook (<30 mins)"}
                 
-                if plan_dinner_for_day:
-                    dinner_style_for_day = st.radio("Style:", ["Quick Cook (<30 mins)", "Full Cook (longer prep)"], 
-                                                    index=0 if st.session_state.dinner_settings[day]['style'] == "Quick Cook (<30 mins)" else 1,
-                                                    horizontal=True, key=f"style_{day}")
-                    st.session_state.dinner_settings[day]['style'] = dinner_style_for_day
+                with st.expander(day, expanded=False):
+                    plan_dinner_for_day = st.checkbox("Plan dinner?", value=st.session_state.dinner_settings[day]['plan'], key=f"plan_{day}")
+                    st.session_state.dinner_settings[day]['plan'] = plan_dinner_for_day
+                    
+                    if plan_dinner_for_day:
+                        dinner_style_for_day = st.radio("Style:", ["Quick Cook (<30 mins)", "Full Cook (longer prep)"], 
+                                                        index=0 if st.session_state.dinner_settings[day]['style'] == "Quick Cook (<30 mins)" else 1,
+                                                        horizontal=True, key=f"style_{day}")
+                        st.session_state.dinner_settings[day]['style'] = dinner_style_for_day
         
         if st.button("Generate Full Meal Plan", type="primary"):
             with st.spinner("🧠 Gemini is creating your personalized meal plan..."):
