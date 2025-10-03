@@ -111,6 +111,19 @@ def generate_shopping_list(meal_plan, pantry_items):
 
 def main():
     st.set_page_config(page_title="Weekly Meal Planner", layout="wide")
+    
+    # --- CUSTOM CSS TO WIDEN THE SIDEBAR ---
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] {
+            width: 400px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
     # Initialize session state
     for key, default in [('meal_plan', {}), ('pantry_items', ["Olive Oil", "Salt", "Black Pepper", "Garlic", "Onion Powder"]), ('shopping_list', ""), ('generated_meals', None), ('dinner_settings', {})]:
@@ -198,8 +211,11 @@ def main():
                 st.markdown("#####  lunchtime 🥪 (Prep-Ahead)")
                 if meals['Lunch']:
                     with st.expander(f"**{meals['Lunch']['name']}**"):
-                        st.markdown("**Ingredients:**"); [st.markdown(f"- {ing['item']}: {ing['quantity']} {ing['unit']}") for ing in meals['Lunch']['ingredients']]
-                        st.markdown("**Instructions:**"); st.write(meals['Lunch']['instructions'])
+                        st.markdown("**Ingredients:**")
+                        for ing in meals['Lunch']['ingredients']:
+                            st.markdown(f"- {ing['item']}: {ing['quantity']} {ing['unit']}")
+                        st.markdown("**Instructions:**")
+                        st.write(meals['Lunch']['instructions'])
                         if st.button("Regenerate Lunch", key=f"regen_lunch_{day}"):
                             st.session_state.meal_plan[day]['Lunch'] = get_random_meal('Lunch', meals['Lunch'])
                             st.session_state.shopping_list = ""; st.rerun()
@@ -209,8 +225,11 @@ def main():
                     st.markdown("##### Evening Meal 🍝 (Cook Fresh)")
                     if meals['Dinner']:
                         with st.expander(f"**{meals['Dinner']['name']}**"):
-                            st.markdown("**Ingredients:**"); [st.markdown(f"- {ing['item']}: {ing['quantity']} {ing['unit']}") for ing in meals['Dinner']['ingredients']]
-                            st.markdown("**Instructions:**"); st.write(meals['Dinner']['instructions'])
+                            st.markdown("**Ingredients:**")
+                            for ing in meals['Dinner']['ingredients']:
+                                st.markdown(f"- {ing['item']}: {ing['quantity']} {ing['unit']}")
+                            st.markdown("**Instructions:**")
+                            st.write(meals['Dinner']['instructions'])
                             if st.button("Regenerate Dinner", key=f"regen_dinner_{day}"):
                                 day_settings = st.session_state.dinner_settings.get(day)
                                 meal_pool = "QuickDinner" if day_settings['style'] == "Quick Cook (<30 mins)" else "FullDinner"
