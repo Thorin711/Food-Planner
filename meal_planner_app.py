@@ -238,33 +238,32 @@ def main():
             lunch = lunches[i] if i < len(lunches) else None
             dinner = dinners.get(day)
             
-            cols = st.columns(2) if dinner else [st.container()]
-            
-            with cols[0]:
-                st.markdown("#####  lunchtime 🥪 (Assembly)")
-                if lunch:
-                    with st.expander(f"**{lunch['name']}**"):
-                        st.markdown(format_instructions(lunch['assembly_instructions']))
+            # Render Lunch section
+            st.markdown("#####  lunchtime 🥪 (Assembly)")
+            if lunch:
+                with st.expander(f"**{lunch['name']}**"):
+                    st.markdown(format_instructions(lunch['assembly_instructions']))
 
+            # Render Dinner section if it exists for the day
             if dinner:
-                with cols[1]:
-                    st.markdown("##### Evening Meal 🍝 (Cook Fresh)")
-                    with st.expander(f"**{dinner['name']}**"):
-                        st.markdown("**Ingredients:**")
-                        ingredients_text = ""
-                        for ing in dinner['ingredients']:
-                            ingredients_text += f"- {ing['item']}: {ing['quantity']} {ing['unit']}\n"
-                        st.markdown(ingredients_text)
-                        
-                        st.markdown("**Instructions:**")
-                        st.markdown(format_instructions(dinner['instructions']))
-                        if st.button("Regenerate Dinner", key=f"regen_dinner_{day}"):
-                            day_settings = st.session_state.dinner_settings.get(day)
-                            meal_pool = "QuickDinner" if day_settings['style'] == "Quick Cook (<30 mins)" else "FullDinner"
-                            st.session_state.meal_plan['Dinners'][day] = get_random_meal(meal_pool, dinner)
-                            st.session_state.shopping_list = ""
-                            st.rerun()
-            st.write("") 
+                st.markdown("##### Evening Meal 🍝 (Cook Fresh)")
+                with st.expander(f"**{dinner['name']}**"):
+                    st.markdown("**Ingredients:**")
+                    ingredients_text = ""
+                    for ing in dinner['ingredients']:
+                        ingredients_text += f"- {ing['item']}: {ing['quantity']} {ing['unit']}\n"
+                    st.markdown(ingredients_text)
+                    
+                    st.markdown("**Instructions:**")
+                    st.markdown(format_instructions(dinner['instructions']))
+                    if st.button("Regenerate Dinner", key=f"regen_dinner_{day}"):
+                        day_settings = st.session_state.dinner_settings.get(day)
+                        meal_pool = "QuickDinner" if day_settings['style'] == "Quick Cook (<30 mins)" else "FullDinner"
+                        st.session_state.meal_plan['Dinners'][day] = get_random_meal(meal_pool, dinner)
+                        st.session_state.shopping_list = ""
+                        st.rerun()
+            
+            st.divider()
 
     if st.session_state.meal_plan:
         st.title("🛒 Shopping & Pantry")
@@ -287,3 +286,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
